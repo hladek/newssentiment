@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analýza sentimentu - AI asistent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 700px;
+            width: 100%;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .input-section {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #333;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 150px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #analyzeBtn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        #analyzeBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #analyzeBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #clearBtn {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        #clearBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+        }
+
+        .result-section {
+            display: none;
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 25px;
+            animation: slideIn 0.5s ease-out;
+            background: white;
+            border: 2px solid #e0e0e0;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-section.show {
+            display: block;
+        }
+
+        .result-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .result-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .result-subtitle {
+            font-size: 1em;
+            color: #666;
+        }
+
+        .sentences-container {
+            margin-top: 20px;
+        }
+
+        .sentence-item {
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+            line-height: 1.8;
+            font-size: 1.05em;
+            border-left: 4px solid;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .sentence-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .sentence-item.positive {
+            background-color: #e8f5e9;
+            border-left-color: #4caf50;
+            color: #2e7d32;
+        }
+
+        .sentence-item.negative {
+            background-color: #ffebee;
+            border-left-color: #f44336;
+            color: #c62828;
+        }
+
+        .sentence-item.neutral {
+            background-color: #f5f5f5;
+            border-left-color: #757575;
+            color: #424242;
+        }
+
+        .sentence-emotion {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 10px;
+            text-transform: uppercase;
+        }
+
+        .sentence-item.positive .sentence-emotion {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        .sentence-item.negative .sentence-emotion {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .sentence-item.neutral .sentence-emotion {
+            background-color: #757575;
+            color: white;
+        }
+
+        .statistics {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .result-section.error {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .error-emoji {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .error-message {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎭 Analýza sentimentu</h1>
+        <p class="subtitle">AI detekcia emócií v texte</p>
+
+        <div class="input-section">
+            <label for="textInput">Zadajte váš text:</label>
+            <textarea 
+                id="textInput" 
+                placeholder="Napíšte alebo vložte akýkoľvek text na analýzu jeho sentimentu... (napr. 'Tento produkt je skvelý! Prekonal moje očakávania.')"></textarea>
+        </div>
+
+        <div class="button-container">
+            <button id="analyzeBtn">🔍 Analyzovať sentiment</button>
+            <button id="clearBtn">🗑️ Vymazať</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Analyzujem sentiment...</p>
+        </div>
+
+        <div class="result-section" id="result">
+            <div class="result-header">
+                <div class="result-title">📊 Výsledky analýzy</div>
+                <div class="result-subtitle">Sentiment jednotlivých viet</div>
+            </div>
+            <div class="sentences-container" id="sentencesContainer"></div>
+            <div class="statistics" id="statistics"></div>
+        </div>
+    </div>
+
+    <script>
+        const textInput = document.getElementById('textInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const sentencesContainer = document.getElementById('sentencesContainer');
+        const statistics = document.getElementById('statistics');
+
+        analyzeBtn.addEventListener('click', async () => {
+            const text = textInput.value.trim();
+            
+            if (!text) {
+                alert('Prosím, zadajte nejaký text na analýzu!');
+                return;
+            }
+
+            analyzeBtn.disabled = true;
+            loading.classList.add('show');
+            result.classList.remove('show');
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    displayError(data.error || 'Vyskytla sa chyba');
+                }
+            } catch (error) {
+                displayError('Nepodarilo sa pripojiť na server');
+            } finally {
+                analyzeBtn.disabled = false;
+                loading.classList.remove('show');
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            textInput.value = '';
+            result.classList.remove('show');
+            textInput.focus();
+        });
+
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                analyzeBtn.click();
+            }
+        });
+
+        function displayResults(data) {
+            if (!data.sentences || !Array.isArray(data.sentences)) {
+                displayError('Neplatný formát odpovede');
+                return;
+            }
+
+            result.className = 'result-section show';
+            sentencesContainer.innerHTML = '';
+            
+            // Počítanie sentimentov
+            let positiveCount = 0;
+            let negativeCount = 0;
+            let neutralCount = 0;
+
+            // Vytvorenie elementov pre každú vetu
+            data.sentences.forEach((sentence, index) => {
+                const emotion = sentence.emotion.toLowerCase();
+                const sentenceDiv = document.createElement('div');
+                sentenceDiv.className = `sentence-item ${emotion}`;
+                
+                // Slovenský preklad emócií
+                let emotionLabel = emotion;
+                if (emotion === 'positive') {
+                    emotionLabel = 'pozitívny';
+                    positiveCount++;
+                } else if (emotion === 'negative') {
+                    emotionLabel = 'negatívny';
+                    negativeCount++;
+                } else if (emotion === 'neutral') {
+                    emotionLabel = 'neutrálny';
+                    neutralCount++;
+                }
+                
+                sentenceDiv.innerHTML = `
+                    <span class="sentence-text">${sentence.text}</span>
+                    <span class="sentence-emotion">${emotionLabel}</span>
+                `;
+                
+                sentencesContainer.appendChild(sentenceDiv);
+            });
+
+            // Zobrazenie statistík
+            const total = data.sentences.length;
+            statistics.innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-number">${positiveCount}</span>
+                    <span class="stat-label">Pozitívne</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${negativeCount}</span>
+                    <span class="stat-label">Negatívne</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${neutralCount}</span>
+                    <span class="stat-label">Neutrálne</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${total}</span>
+                    <span class="stat-label">Celkom viet</span>
+                </div>
+            `;
+        }
+
+        function displayError(message) {
+            result.className = 'result-section show error';
+            sentencesContainer.innerHTML = `
+                <div class="error-emoji">❌</div>
+                <div class="error-message">${message}</div>
+            `;
+            statistics.innerHTML = '';
+        }
+
+        // Focus on textarea on load
+        textInput.focus();
+    </script>
+</body>
+</html>
