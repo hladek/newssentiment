@@ -333,7 +333,7 @@
             result.classList.remove('show');
 
             try {
-                const response = await fetch('/analyze', {
+                const response = await fetch('/senti/analyze', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

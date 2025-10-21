@@ -61,7 +61,11 @@ Vráť iba JSON bez žiadneho ďalšieho textu:"""
 def index():
     return render_template('index.html')
 
-@app.route('/analyze', methods=['POST'])
+@app.route('/senti')
+def index2():
+    return render_template('index.html')
+
+@app.route('/senti/analyze', methods=['POST'])
 def analyze():
     text = request.json.get('text', '')
     
@@ -77,4 +81,4 @@ def analyze():
     return jsonify(result)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5448)
