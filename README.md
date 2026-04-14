@@ -1,11 +1,11 @@
 # Aplikácia na analýzu sentimentu
 
-Farebná Flask webová aplikácia, ktorá analyzuje sentiment textu pomocou jazykových modelov Ollama.
+Farebná Flask webová aplikácia, ktorá analyzuje sentiment textu pomocou OpenAI kompatibilného API.
 
 ## Vlastnosti
 
 - 🎨 Krásne, farebné gradientové používateľské rozhranie
-- 🤖 AI analýza sentimentu pomocou Ollama Python API
+- 🤖 AI analýza sentimentu pomocou OpenAI kompatibilného API
 - 📝 Analýza sentimentu po vetách
 - 🎭 Farebné označenie viet (zelená=pozitívny, červená=negatívny, šedá=neutrálny)
 - 📊 Štatistiky počtu pozitívnych, negatívnych a neutrálnych viet
@@ -13,9 +13,9 @@ Farebná Flask webová aplikácia, ktorá analyzuje sentiment textu pomocou jazy
 
 ## Požiadavky
 
-- Python 3.7 alebo vyššia verzia
-- Nainštalovaná a spustená Ollama ([Inštalácia Ollama](https://ollama.ai))
-- Stiahnutý jazykový model v Ollama (napr. llama2)
+- Python 3.12 alebo vyššia verzia
+- Dostupné OpenAI kompatibilné API
+- Nakonfigurované premenné prostredia `OPENAI_API_KEY`, `OPENAI_BASE_URL` a `OPENAI_MODEL`
 
 ## Inštalácia
 
@@ -24,14 +24,11 @@ Farebná Flask webová aplikácia, ktorá analyzuje sentiment textu pomocou jazy
 pip install -r requirements.txt
 ```
 
-2. Uistite sa, že Ollama beží:
+2. Nastavte premenné prostredia:
 ```bash
-ollama serve
-```
-
-3. Stiahnite jazykový model (ak ste tak ešte neurobili):
-```bash
-ollama pull llama2
+export OPENAI_API_KEY="your-api-key"
+export OPENAI_BASE_URL="https://your-openai-compatible-endpoint/v1"
+export OPENAI_MODEL="your-model-name"
 ```
 
 ## Použitie
@@ -43,7 +40,7 @@ python app.py
 
 2. Otvorte prehliadač a prejdite na:
 ```
-http://localhost:5000
+http://localhost:5448
 ```
 
 3. Zadajte text do textového poľa a kliknite na "Analyzovať sentiment"
@@ -57,8 +54,8 @@ http://localhost:5000
 
 1. Používateľ zadá text do webového formulára
 2. Text sa odošle do Flask backendu
-3. Backend použije Ollama Python API na odoslanie promptu
-4. Ollama analyzuje sentiment každej vety pomocou jazykového modelu
+3. Backend použije OpenAI kompatibilné API na odoslanie promptu
+4. Model analyzuje sentiment každej vety
 5. Výsledky sa zobrazia ako zoznam farebne označených viet so štatistikami
 
 ## Očakávaný formát odpovede z modelu
@@ -81,12 +78,15 @@ Model by mal vrátiť JSON v nasledujúcom formáte:
 
 ## Prispôsobenie
 
-- **Zmena modelu**: Upravte `app.py` a zmeňte parameter `model='llama2'` vo funkcii `ollama.generate()`
+- **Zmena modelu**: Upravte premennú prostredia `OPENAI_MODEL`
+- **Zmena API endpointu**: Upravte premennú prostredia `OPENAI_BASE_URL`
+- **Zmena API kľúča**: Upravte premennú prostredia `OPENAI_API_KEY`
 - **Úprava farieb**: Upravte CSS farby pre `.sentence-item.positive`, `.sentence-item.negative`, `.sentence-item.neutral` v `templates/index.html`
 - **Zmena portu**: Upravte parameter `port` v `app.run()` v `app.py`
 
 ## Riešenie problémov
 
-- **"Nedá sa pripojiť k Ollama"**: Uistite sa, že Ollama beží príkazom `ollama serve`
+- **"Chyba konfigurácie"**: Skontrolujte, či sú nastavené `OPENAI_API_KEY`, `OPENAI_BASE_URL` a `OPENAI_MODEL`
+- **"Nedá sa pripojiť k OpenAI kompatibilnému API"**: Skontrolujte `OPENAI_BASE_URL` a dostupnosť služby
 - **Neplatný formát odpovede**: Skontrolujte, či model vracia správny JSON formát
 - **Port sa už používa**: Zmeňte port v `app.py` na inú hodnotu (napr. 5001)

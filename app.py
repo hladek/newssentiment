@@ -1,60 +1,84 @@
-from flask import Flask, render_template, request, jsonify
-import ollama
 import json
+import os
 import re
+
+from flask import Flask, jsonify, render_template, request
+from openai import APIConnectionError, APIStatusError, OpenAI
 
 app = Flask(__name__)
 
-def analyze_sentiment_with_ollama(text):
-    """Odoslanie textu do Ollama na analýzu sentimentu"""
-    try:
-        prompt = f"""Analyzuj sentiment každej vety v nasledujúcom texte. Vráť výsledok v JSON formáte s poľom "sentences", kde každý objekt má "text" (vetu) a "emotion" (positive, negative alebo neutral).
+def get_openai_settings():
+    required_settings = {
+        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
+        "OPENAI_BASE_URL": os.getenv("OPENAI_BASE_URL"),
+        "OPENAI_MODEL": os.getenv("OPENAI_MODEL"),
+    }
+    missing_settings = [name for name, value in required_settings.items() if not value]
+    if missing_settings:
+        missing_list = ", ".join(missing_settings)
+        raise RuntimeError(f"Chyba konfigurácie. Nastavte premenné prostredia: {missing_list}")
+
+    return required_settings
+
+
+def analyze_sentiment_with_openai(text):
+    """Odoslanie textu do OpenAI kompatibilného API na analýzu sentimentu."""
+    settings = get_openai_settings()
+    client = OpenAI(
+        api_key=settings["OPENAI_API_KEY"],
+        base_url=settings["OPENAI_BASE_URL"],
+    )
+
+    prompt = f"""Analyzuj sentiment každej vety v nasledujúcom texte. Vráť výsledok v JSON formáte s poľom "sentences", kde každý objekt má "text" (vetu) a "emotion" (positive, negative alebo neutral).
 
 Text: {text}
 
 Vráť iba JSON bez žiadneho ďalšieho textu:"""
-        
-        response = ollama.generate(
-            model='gpt-oss',
-            prompt=prompt
+
+    try:
+        response = client.chat.completions.create(
+            model=settings["OPENAI_MODEL"],
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Si asistent na analýzu sentimentu. Odpovedaj iba validným JSON objektom.",
+                },
+                {"role": "user", "content": prompt},
+            ],
         )
-        
-        response_text = response['response'].strip()
-        
-        # Pokús sa parsovať JSON odpoveď
-        try:
-            # Nájdi JSON v odpovedi (môže byť obklopený iným textom)
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                sentiment_data = json.loads(json_match.group())
-                return sentiment_data
-            else:
-                # Ak JSON nebol nájdený, skús parsovať celú odpoveď
-                sentiment_data = json.loads(response_text)
-                return sentiment_data
-        except json.JSONDecodeError:
-            # Ak sa nepodarí parsovať JSON, vráť chybu
-            return {
-                "error": True,
-                "message": "Nepodarilo sa spracovať odpoveď z modelu",
-                "raw_response": response_text
-            }
-            
-    except ollama.ResponseError as e:
+    except APIConnectionError:
         return {
             "error": True,
-            "message": f"Chyba Ollama: {str(e)}"
+            "message": "Nedá sa pripojiť k OpenAI kompatibilnému API. Skontrolujte OPENAI_BASE_URL a dostupnosť služby."
         }
-    except Exception as e:
-        error_message = str(e)
-        if "connection" in error_message.lower():
-            return {
-                "error": True,
-                "message": "Nedá sa pripojiť k Ollama. Uistite sa, že Ollama beží (ollama serve)"
-            }
+    except APIStatusError as e:
+        status_code = getattr(e, "status_code", "neznámy")
         return {
             "error": True,
-            "message": f"Chyba: {error_message}"
+            "message": f"OpenAI kompatibilné API vrátilo chybu (status {status_code}): {e.message}"
+        }
+
+    if not response.choices or not response.choices[0].message.content:
+        return {
+            "error": True,
+            "message": "Model nevrátil žiadny obsah odpovede"
+        }
+
+    response_text = response.choices[0].message.content.strip()
+
+    try:
+        json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+        if json_match:
+            sentiment_data = json.loads(json_match.group())
+            return sentiment_data
+
+        sentiment_data = json.loads(response_text)
+        return sentiment_data
+    except json.JSONDecodeError:
+        return {
+            "error": True,
+            "message": "Nepodarilo sa spracovať odpoveď z modelu",
+            "raw_response": response_text
         }
 
 @app.route('/')
@@ -67,12 +91,16 @@ def index2():
 
 @app.route('/senti/analyze', methods=['POST'])
 def analyze():
-    text = request.json.get('text', '')
+    payload = request.get_json(silent=True) or {}
+    text = payload.get('text', '')
     
     if not text.strip():
         return jsonify({'error': 'Prosím, zadajte nejaký text na analýzu'}), 400
     
-    result = analyze_sentiment_with_ollama(text)
+    try:
+        result = analyze_sentiment_with_openai(text)
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 500
     
     # Skontroluj, či je výsledok chybový
     if isinstance(result, dict) and result.get('error'):
