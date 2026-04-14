@@ -2,32 +2,54 @@ import json
 import os
 import re
 
-from flask import Flask, jsonify, render_template, request
+import streamlit as st
 from openai import APIConnectionError, APIStatusError, OpenAI
 
-app = Flask(__name__)
+EMOTION_STYLES = {
+    "positive": {
+        "bg": "#e8f5e9",
+        "border": "#4caf50",
+        "color": "#2e7d32",
+        "badge_bg": "#4caf50",
+        "label": "pozitívny ✅",
+    },
+    "negative": {
+        "bg": "#ffebee",
+        "border": "#f44336",
+        "color": "#c62828",
+        "badge_bg": "#f44336",
+        "label": "negatívny ❌",
+    },
+    "neutral": {
+        "bg": "#f5f5f5",
+        "border": "#757575",
+        "color": "#424242",
+        "badge_bg": "#757575",
+        "label": "neutrálny ➖",
+    },
+}
 
-def get_openai_settings():
-    required_settings = {
-        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
-        "OPENAI_BASE_URL": os.getenv("OPENAI_BASE_URL"),
-        "OPENAI_MODEL": os.getenv("OPENAI_MODEL"),
-    }
-    missing_settings = [name for name, value in required_settings.items() if not value]
-    if missing_settings:
-        missing_list = ", ".join(missing_settings)
-        raise RuntimeError(f"Chyba konfigurácie. Nastavte premenné prostredia: {missing_list}")
 
-    return required_settings
+def get_openai_client():
+    api_key = os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("OPENAI_BASE_URL")
+    model = os.getenv("OPENAI_MODEL")
+
+    missing = [name for name, val in [
+        ("OPENAI_API_KEY", api_key),
+        ("OPENAI_BASE_URL", base_url),
+        ("OPENAI_MODEL", model),
+    ] if not val]
+
+    if missing:
+        raise RuntimeError(f"Chyba konfigurácie. Nastavte premenné prostredia: {', '.join(missing)}")
+
+    return OpenAI(api_key=api_key, base_url=base_url), model
 
 
-def analyze_sentiment_with_openai(text):
+def analyze_sentiment(text):
     """Odoslanie textu do OpenAI kompatibilného API na analýzu sentimentu."""
-    settings = get_openai_settings()
-    client = OpenAI(
-        api_key=settings["OPENAI_API_KEY"],
-        base_url=settings["OPENAI_BASE_URL"],
-    )
+    client, model = get_openai_client()
 
     prompt = f"""Analyzuj sentiment každej vety v nasledujúcom texte. Vráť výsledok v JSON formáte s poľom "sentences", kde každý objekt má "text" (vetu) a "emotion" (positive, negative alebo neutral).
 
@@ -37,7 +59,7 @@ Vráť iba JSON bez žiadneho ďalšieho textu:"""
 
     try:
         response = client.chat.completions.create(
-            model=settings["OPENAI_MODEL"],
+            model=model,
             messages=[
                 {
                     "role": "system",
@@ -47,66 +69,110 @@ Vráť iba JSON bez žiadneho ďalšieho textu:"""
             ],
         )
     except APIConnectionError:
-        return {
-            "error": True,
-            "message": "Nedá sa pripojiť k OpenAI kompatibilnému API. Skontrolujte OPENAI_BASE_URL a dostupnosť služby."
-        }
+        raise RuntimeError(
+            "Nedá sa pripojiť k OpenAI kompatibilnému API. "
+            "Skontrolujte OPENAI_BASE_URL a dostupnosť služby."
+        )
     except APIStatusError as e:
         status_code = getattr(e, "status_code", "neznámy")
-        return {
-            "error": True,
-            "message": f"OpenAI kompatibilné API vrátilo chybu (status {status_code}): {e.message}"
-        }
+        raise RuntimeError(
+            f"OpenAI kompatibilné API vrátilo chybu (status {status_code}): {e.message}"
+        )
 
     if not response.choices or not response.choices[0].message.content:
-        return {
-            "error": True,
-            "message": "Model nevrátil žiadny obsah odpovede"
-        }
+        raise RuntimeError("Model nevrátil žiadny obsah odpovede")
 
     response_text = response.choices[0].message.content.strip()
 
     try:
         json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-        if json_match:
-            sentiment_data = json.loads(json_match.group())
-            return sentiment_data
+        raw = json_match.group() if json_match else response_text
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(
+            f"Nepodarilo sa spracovať odpoveď z modelu: {e}\n\nRaw: {response_text}"
+        )
 
-        sentiment_data = json.loads(response_text)
-        return sentiment_data
-    except json.JSONDecodeError:
-        return {
-            "error": True,
-            "message": "Nepodarilo sa spracovať odpoveď z modelu",
-            "raw_response": response_text
-        }
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+def render_sentence(sentence):
+    emotion = sentence.get("emotion", "neutral").lower()
+    style = EMOTION_STYLES.get(emotion, EMOTION_STYLES["neutral"])
+    text = sentence.get("text", "")
+    st.markdown(
+        f"""
+        <div style="
+            background:{style['bg']};
+            border-left:4px solid {style['border']};
+            color:{style['color']};
+            padding:12px 16px;
+            border-radius:8px;
+            margin-bottom:10px;
+            font-size:1.05em;
+            line-height:1.7;
+        ">
+            {text}
+            &nbsp;<span style="
+                background:{style['badge_bg']};
+                color:white;
+                padding:2px 10px;
+                border-radius:12px;
+                font-size:0.82em;
+                font-weight:600;
+                text-transform:uppercase;
+            ">{style['label']}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-@app.route('/senti')
-def index2():
-    return render_template('index.html')
 
-@app.route('/senti/analyze', methods=['POST'])
-def analyze():
-    payload = request.get_json(silent=True) or {}
-    text = payload.get('text', '')
-    
-    if not text.strip():
-        return jsonify({'error': 'Prosím, zadajte nejaký text na analýzu'}), 400
-    
-    try:
-        result = analyze_sentiment_with_openai(text)
-    except RuntimeError as e:
-        return jsonify({'error': str(e)}), 500
-    
-    # Skontroluj, či je výsledok chybový
-    if isinstance(result, dict) and result.get('error'):
-        return jsonify({'error': result.get('message', 'Neznáma chyba')}), 500
-    
-    return jsonify(result)
+# ── UI ──────────────────────────────────────────────────────────────────────
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5448)
+st.set_page_config(page_title="Analýza sentimentu", page_icon="🎭")
+
+st.title("🎭 Analýza sentimentu")
+st.caption("AI detekcia emócií v texte")
+
+text_input = st.text_area(
+    "Zadajte váš text:",
+    placeholder="Napíšte alebo vložte akýkoľvek text na analýzu jeho sentimentu...",
+    height=180,
+)
+
+col1, col2 = st.columns([3, 1])
+analyze_clicked = col1.button("🔍 Analyzovať sentiment", use_container_width=True)
+clear_clicked = col2.button("🗑️ Vymazať", use_container_width=True)
+
+if clear_clicked:
+    st.rerun()
+
+if analyze_clicked:
+    if not text_input.strip():
+        st.warning("Prosím, zadajte nejaký text na analýzu.")
+    else:
+        with st.spinner("Analyzujem sentiment..."):
+            try:
+                result = analyze_sentiment(text_input)
+            except RuntimeError as e:
+                st.error(str(e))
+                st.stop()
+
+        sentences = result.get("sentences", [])
+        if not sentences:
+            st.error("Model nevrátil žiadne vety.")
+            st.stop()
+
+        st.subheader("📊 Výsledky analýzy")
+
+        counts = {"positive": 0, "negative": 0, "neutral": 0}
+        for sentence in sentences:
+            emotion = sentence.get("emotion", "neutral").lower()
+            counts[emotion] = counts.get(emotion, 0) + 1
+            render_sentence(sentence)
+
+        st.divider()
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("✅ Pozitívne", counts["positive"])
+        m2.metric("❌ Negatívne", counts["negative"])
+        m3.metric("➖ Neutrálne", counts["neutral"])
+        m4.metric("📝 Celkom", len(sentences))

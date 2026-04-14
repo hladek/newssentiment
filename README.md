@@ -1,11 +1,11 @@
 # Aplikácia na analýzu sentimentu
 
-Farebná Flask webová aplikácia, ktorá analyzuje sentiment textu pomocou OpenAI kompatibilného API.
+Farebná Streamlit webová aplikácia, ktorá analyzuje sentiment textu pomocou OpenAI kompatibilného API.
 
 ## Vlastnosti
 
 - 🎨 Krásne, farebné gradientové používateľské rozhranie
-- 🤖 AI analýza sentimentu pomocou OpenAI kompatibilného API
+- 🤖 AI analýza sentimentu pomocou OpenAI kompatibilného API (cez Streamlit)
 - 📝 Analýza sentimentu po vetách
 - 🎭 Farebné označenie viet (zelená=pozitívny, červená=negatívny, šedá=neutrálny)
 - 📊 Štatistiky počtu pozitívnych, negatívnych a neutrálnych viet
@@ -33,14 +33,14 @@ export OPENAI_MODEL="your-model-name"
 
 ## Použitie
 
-1. Spustite Flask aplikáciu:
+1. Spustite Streamlit aplikáciu:
 ```bash
-python app.py
+streamlit run app.py
 ```
 
 2. Otvorte prehliadač a prejdite na:
 ```
-http://localhost:5448
+http://localhost:8501
 ```
 
 3. Zadajte text do textového poľa a kliknite na "Analyzovať sentiment"
@@ -54,7 +54,7 @@ http://localhost:5448
 
 1. Používateľ zadá text do webového formulára
 2. Text sa odošle do Flask backendu
-3. Backend použije OpenAI kompatibilné API na odoslanie promptu
+3. Backend použije OpenAI kompatibilné API na odoslanie promptu cez Streamlit
 4. Model analyzuje sentiment každej vety
 5. Výsledky sa zobrazia ako zoznam farebne označených viet so štatistikami
 
@@ -82,7 +82,7 @@ Model by mal vrátiť JSON v nasledujúcom formáte:
 - **Zmena API endpointu**: Upravte premennú prostredia `OPENAI_BASE_URL`
 - **Zmena API kľúča**: Upravte premennú prostredia `OPENAI_API_KEY`
 - **Úprava farieb**: Upravte CSS farby pre `.sentence-item.positive`, `.sentence-item.negative`, `.sentence-item.neutral` v `templates/index.html`
-- **Zmena portu**: Upravte parameter `port` v `app.run()` v `app.py`
+- **Zmena portu**: Spustite `streamlit run app.py --server.port=XXXX`
 
 ## Riešenie problémov
 
